@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { CategoryStrip } from "@/components/storefront/category-strip";
+import { LifestyleBanner } from "@/components/storefront/lifestyle-banner";
 import { ProductCard } from "@/components/storefront/product-card";
 import { listCategories, listProducts } from "@/server/domain/catalog";
 
@@ -8,6 +10,14 @@ export default async function Home() {
     listProducts({ categorySlug: "pria" }),
     listProducts({ categorySlug: "wanita" }),
   ]);
+  const perCategory = await Promise.all(categories.map((c) => listProducts({ categorySlug: c.slug })));
+  const items = categories.map((c, i) => ({
+    slug: c.slug,
+    name: c.name,
+    count: perCategory[i].length,
+    image: perCategory[i][0]?.images[0],
+    polaroid: perCategory[i][1]?.images[0] ?? perCategory[i][0]?.images[0],
+  }));
   return (
     <div className="flex flex-col gap-14">
       <section className="grid gap-6 md:grid-cols-[2fr_1fr]">
@@ -34,13 +44,7 @@ export default async function Home() {
           ))}
         </div>
       </section>
-      <section className="grid grid-cols-2 gap-3 md:grid-cols-5">
-        {categories.map((c) => (
-          <Link key={c.id} href={`/kategori/${c.slug}`} className="bg-olive p-6 text-lime">
-            <p className="text-sm font-bold uppercase tracking-widest">{c.name}</p>
-          </Link>
-        ))}
-      </section>
+      <CategoryStrip items={items} />
       <section>
         <h2 className="text-2xl font-bold">Terbaru untuk Wanita</h2>
         <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
@@ -49,10 +53,7 @@ export default async function Home() {
           ))}
         </div>
       </section>
-      <section className="bg-olive p-10 text-center text-lime">
-        <p className="text-3xl font-extrabold uppercase tracking-tight">Gaya Hidup · Tas · Kacamata</p>
-        <p className="mt-2 text-sm uppercase tracking-widest">Barang handcrafted untuk keseharian</p>
-      </section>
+      <LifestyleBanner items={items} />
     </div>
   );
 }

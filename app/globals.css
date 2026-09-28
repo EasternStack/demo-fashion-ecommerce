@@ -9,8 +9,61 @@
   --font-display: "Archivo", "Inter Tight", system-ui, sans-serif;
 }
 
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes settle {
+  from {
+    opacity: 0;
+    transform: translateY(-16px) scale(1.05);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+html,
+body {
+  overflow-x: clip;
+}
+
 body {
   background: var(--color-cream);
   color: var(--color-olive);
   font-family: var(--font-display);
+}
+
+/* Scroll-driven reveal; falls back to a time-based run where view() is unsupported */
+.reveal-scroll,
+.reveal-drop {
+  animation: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-timeline: view();
+  animation-range: entry 10% entry 45%;
+}
+
+.reveal-drop {
+  animation-name: settle;
+  animation-range: entry 20% entry 55%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-scroll,
+  .reveal-drop {
+    animation: none;
+  }
+}
+
+.grain {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  opacity: 0.14;
+  mix-blend-mode: soft-light;
 }

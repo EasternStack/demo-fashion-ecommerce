@@ -1,0 +1,16 @@
+@import "tailwindcss";
+
+@theme {
+  --color-cream: #f4f6ec;
+  --color-lime: #c8f169;
+  --color-olive: #2f3b22;
+  --color-sage: #a9c3a2;
+  --color-card: #ececec;
+  --font-display: "Archivo", "Inter Tight", system-ui, sans-serif;
+}
+
+body {
+  background: var(--color-cream);
+  color: var(--color-olive);
+  font-family: var(--font-display);
+}

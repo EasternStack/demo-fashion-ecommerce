@@ -39,6 +39,7 @@ export function assertRole(session: Session | null, role: Role): Session {
 
 export async function loginSession(userId: string, role: Role): Promise<void> {
   const token = await new SignJWT({ role })
+    .setProtectedHeader({ alg: "HS256" })
     .setSubject(userId)
     .setIssuedAt()
     .setExpirationTime("7d")

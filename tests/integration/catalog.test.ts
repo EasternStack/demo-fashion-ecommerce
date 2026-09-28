@@ -29,6 +29,21 @@ describe("catalog", () => {
     expect(tidakAda).toHaveLength(0);
   });
 
+  it("membawa slug dan nama kategori serta field detail produk", async () => {
+    const cat = await makeCategory("Pria");
+    const product = await makeProduct(cat.id, {});
+    await prisma.product.update({
+      where: { id: product.id },
+      data: { material: "Katun combed 240 gsm", features: ["Krease depan"] },
+    });
+    const detail = await getProductBySlug(product.slug);
+    expect(detail?.categorySlug).toBe("pria");
+    expect(detail?.categoryName).toBe("Pria");
+    expect(detail?.material).toBe("Katun combed 240 gsm");
+    expect(detail?.features).toEqual(["Krease depan"]);
+    expect(detail?.careInstructions).toBeNull();
+  });
+
   it("mengembalikan detail produk lengkap dengan varian, null untuk slug asing", async () => {
     const cat = await makeCategory("Pria");
     const created = await makeProduct(cat.id, {

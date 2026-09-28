@@ -1,9 +1,11 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/server/db";
 import { requireUser } from "@/server/session";
 import { addToCart, removeCartItem, setCartQty, type Result } from "@/server/domain/cart";
+import { submitReview } from "@/server/domain/reviews";
 
 export async function addToCartAction(formData: FormData): Promise<Result> {
   const session = await requireUser();
@@ -65,4 +67,27 @@ export async function confirmPaymentAction(orderCode: string, input: CardInput):
   const order = await prisma.order.findFirst({ where: { code: orderCode, userId: session.userId } });
   if (!order) return { error: "Pesanan tidak ditemukan." };
   return confirmPayment(orderCode, input);
+}
+
+export type ReviewFormState = { error?: string; ok?: boolean } | null;
+
+export async function submitReviewAction(_prev: ReviewFormState, formData: FormData): Promise<ReviewFormState> {
+  const session = await requireUser();
+  const productId = String(formData.get("productId") ?? "");
+  const slug = String(formData.get("slug") ?? "");
+  const result = await submitReview(
+    productId,
+    { rating: Number(formData.get("rating")), body: String(formData.get("body") ?? "") },
+    session,
+  );
+  if ("error" in result) {
+    return {
+      error:
+        result.error === "INVALID"
+          ? "Rating 1-5 wajib dipilih dan isi ulasan tidak boleh kosong (maks 2000 karakter)."
+          : "Silakan masuk terlebih dahulu.",
+    };
+  }
+  revalidatePath(`/produk/${slug}`);
+  return { ok: true };
 }

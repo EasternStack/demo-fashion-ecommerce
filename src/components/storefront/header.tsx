@@ -28,7 +28,7 @@ export async function Header() {
         </form>
         <nav className="flex items-center gap-4 text-sm">
           <Link href="/cart" className="relative">
-            Tas
+            Keranjang
             {count > 0 && (
               <span className="absolute -right-3 -top-2 rounded-full bg-lime px-1.5 text-xs font-bold">{count}</span>
             )}

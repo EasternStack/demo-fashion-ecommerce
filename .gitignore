@@ -5,3 +5,4 @@ node_modules/
 next-env.d.ts
 var/uploads/*
 !var/uploads/.gitkeep
+.superpowers/

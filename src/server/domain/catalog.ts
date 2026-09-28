@@ -22,6 +22,12 @@ export type CatalogVariant = {
 export type ProductDetail = CatalogProduct & {
   description: string;
   categoryId: string;
+  categorySlug: string;
+  categoryName: string;
+  material: string | null;
+  careInstructions: string | null;
+  fit: string | null;
+  features: string[];
   variants: CatalogVariant[];
 };
 
@@ -64,13 +70,19 @@ export async function listProducts(opts: ListOpts = {}): Promise<CatalogProduct[
 export async function getProductBySlug(slug: string): Promise<ProductDetail | null> {
   const product = await prisma.product.findUnique({
     where: { slug },
-    include: { variants: { orderBy: [{ colorName: "asc" }, { size: "asc" }] } },
+    include: { variants: { orderBy: [{ colorName: "asc" }, { size: "asc" }] }, category: true },
   });
   if (!product || !product.isActive) return null;
   return {
     ...toCatalogProduct(product),
     description: product.description,
     categoryId: product.categoryId,
+    categorySlug: product.category.slug,
+    categoryName: product.category.name,
+    material: product.material,
+    careInstructions: product.careInstructions,
+    fit: product.fit,
+    features: product.features,
     variants: product.variants.map((v) => ({
       id: v.id,
       colorName: v.colorName,

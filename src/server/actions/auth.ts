@@ -29,6 +29,9 @@ export async function loginAction(_prev: AuthState, formData: FormData): Promise
   if (!user || !(await verifyPassword(password, user.passwordHash))) {
     return { error: "Email atau password salah." };
   }
+  if (user.suspendedAt) {
+    return { error: "Akun ditangguhkan." };
+  }
   await loginSession(user.id, user.role);
   const next = String(formData.get("next") ?? "");
   redirect(next.startsWith("/") ? next : "/");

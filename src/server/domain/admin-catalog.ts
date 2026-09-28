@@ -1,6 +1,8 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/server/db";
 import { assertRole, type Session } from "@/server/session";
 import type { Result } from "@/server/domain/cart";
+import { PAGE_SIZE, parseQuery, type ListResult } from "@/lib/pagination";
 
 export type VariantInput = { id?: string; colorName: string; colorHex: string; size: string; stock: number };
 export type ProductInput = {
@@ -141,25 +143,47 @@ export async function toggleProductActive(productId: string, actor: Session | nu
   return { ok: true };
 }
 
-export async function listProductsForAdmin(actor: Session | null): Promise<AdminProductRow[] | { error: string }> {
+export async function listProductsForAdmin(
+  actor: Session | null,
+  query: { q?: string; page?: number } = {},
+): Promise<ListResult<AdminProductRow> | { error: string }> {
   try {
     assertRole(actor, "ADMIN");
   } catch {
     return { error: "FORBIDDEN" };
   }
-  const products = await prisma.product.findMany({
-    include: { category: true, variants: { select: { stock: true } } },
-    orderBy: { createdAt: "desc" },
-  });
-  return products.map((p) => ({
-    id: p.id,
-    name: p.name,
-    slug: p.slug,
-    categoryName: p.category.name,
-    basePrice: p.basePrice,
-    totalStock: p.variants.reduce((s, v) => s + v.stock, 0),
-    isActive: p.isActive,
-  }));
+  const page = Math.max(1, query.page ?? 1);
+  const q = parseQuery(query.q);
+  const where: Prisma.ProductWhereInput = q
+    ? {
+        OR: [
+          { name: { contains: q, mode: "insensitive" } },
+          { slug: { contains: q, mode: "insensitive" } },
+        ],
+      }
+    : {};
+  const [total, products] = await Promise.all([
+    prisma.product.count({ where }),
+    prisma.product.findMany({
+      where,
+      include: { category: true, variants: { select: { stock: true } } },
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+    }),
+  ]);
+  return {
+    total,
+    rows: products.map((p) => ({
+      id: p.id,
+      name: p.name,
+      slug: p.slug,
+      categoryName: p.category.name,
+      basePrice: p.basePrice,
+      totalStock: p.variants.reduce((s, v) => s + v.stock, 0),
+      isActive: p.isActive,
+    })),
+  };
 }
 
 export async function getProductForEdit(id: string, actor: Session | null): Promise<ProductEdit | null | { error: string }> {

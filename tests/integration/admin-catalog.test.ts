@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "@/server/db";
-import { saveProduct, toggleProductActive, type ProductInput } from "@/server/domain/admin-catalog";
+import { saveProduct, toggleProductActive, listProductsForAdmin, type ProductInput } from "@/server/domain/admin-catalog";
 import { addToCart } from "@/server/domain/cart";
 import { createOrderFromCart } from "@/server/domain/orders";
 import type { Session } from "@/server/session";
@@ -103,5 +103,58 @@ describe("admin-catalog", () => {
     const product = await makeProduct(cat.id);
     await toggleProductActive(product.id, admin);
     expect((await prisma.product.findUnique({ where: { id: product.id } }))?.isActive).toBe(false);
+  });
+
+  describe("listProductsForAdmin", () => {
+    it("menolak aktor non-admin", async () => {
+      await expect(listProductsForAdmin(customer)).resolves.toEqual({ error: "FORBIDDEN" });
+    });
+
+    it("mengembalikan rows dan total", async () => {
+      const cat = await makeCategory();
+      await makeProduct(cat.id);
+      await makeProduct(cat.id);
+      const result = await listProductsForAdmin(admin);
+      expect("error" in result).toBe(false);
+      const { rows, total } = result as { rows: unknown[]; total: number };
+      expect(total).toBe(2);
+      expect(rows).toHaveLength(2);
+    });
+
+    it("mencari berdasarkan nama secara case-insensitive", async () => {
+      const cat = await makeCategory();
+      const jaket = await makeProduct(cat.id);
+      await makeProduct(cat.id);
+      const result = await listProductsForAdmin(admin, { q: jaket.name.toUpperCase() });
+      expect((result as { total: number }).total).toBe(1);
+    });
+
+    it("mencari berdasarkan slug", async () => {
+      const cat = await makeCategory();
+      const jaket = await makeProduct(cat.id);
+      await makeProduct(cat.id);
+      const result = await listProductsForAdmin(admin, { q: jaket.slug });
+      expect((result as { total: number }).total).toBe(1);
+    });
+
+    it("memperlakukan underscore secara literal, bukan wildcard satu karakter", async () => {
+      const cat = await makeCategory();
+      const a = await makeProduct(cat.id);
+      const b = await makeProduct(cat.id);
+      await prisma.product.update({ where: { id: a.id }, data: { name: "ABC" } });
+      await prisma.product.update({ where: { id: b.id }, data: { name: "AXC" } });
+      const result = await listProductsForAdmin(admin, { q: "A_C" });
+      expect((result as { total: number }).total).toBe(0);
+    });
+
+    it("memotong hasil per halaman", async () => {
+      const cat = await makeCategory();
+      for (let i = 0; i < 26; i++) await makeProduct(cat.id);
+      const page1 = await listProductsForAdmin(admin, { page: 1 });
+      const page2 = await listProductsForAdmin(admin, { page: 2 });
+      expect((page1 as { rows: unknown[] }).rows).toHaveLength(25);
+      expect((page2 as { rows: unknown[] }).rows).toHaveLength(1);
+      expect((page2 as { total: number }).total).toBe(26);
+    });
   });
 });

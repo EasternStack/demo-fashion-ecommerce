@@ -1,13 +1,5 @@
 import type { OrderStatus } from "@prisma/client";
-
-const LABELS: Record<OrderStatus, string> = {
-  PENDING: "Menunggu Pembayaran",
-  PAID: "Dibayar",
-  PROCESSING: "Diproses",
-  SHIPPED: "Dikirim",
-  DELIVERED: "Selesai",
-  CANCELLED: "Dibatalkan",
-};
+import { ORDER_STATUS_LABELS } from "@/lib/order-status";
 
 const TONES: Record<OrderStatus, string> = {
   PENDING: "bg-amber-100 text-amber-900",
@@ -19,5 +11,9 @@ const TONES: Record<OrderStatus, string> = {
 };
 
 export function StatusChip({ status }: { status: OrderStatus }) {
-  return <span className={`rounded-full px-3 py-1 text-xs font-semibold ${TONES[status]}`}>{LABELS[status]}</span>;
+  return (
+    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${TONES[status]}`}>
+      {ORDER_STATUS_LABELS[status]}
+    </span>
+  );
 }

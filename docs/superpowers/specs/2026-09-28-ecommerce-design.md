@@ -23,7 +23,8 @@ Website e-commerce fungsional end-to-end sebagai demo: pelanggan dapat menjelaja
 ### Out-of-scope (eksplisit)
 
 - Integrasi payment gateway / kurir nyata.
-- Kupon/diskon, wishlist fungsional, review produk, dashboard analitik admin, manajemen kategori via admin (kategori hanya dari seed).
+- Kupon/diskon, wishlist fungsional, review produk, manajemen kategori via admin (kategori hanya dari seed).
+- ~~Dashboard analitik admin~~ — **dicabut 2026-09-28**, lihat `2026-09-28-admin-console-design.md`.
 - Cancel pesanan oleh customer (cancel hanya dari admin).
 - Guest checkout (checkout wajib login).
 - Deploy/production hosting (demo lokal-first; kode tidak menghalangi deploy nanti).

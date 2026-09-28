@@ -1,6 +1,8 @@
 import type { OrderStatus } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { SHIPPING_FLAT_COST } from "@/lib/constants";
 import { canTransition } from "@/lib/order-status";
+import { PAGE_SIZE, parseQuery, type ListResult } from "@/lib/pagination";
 import { prisma } from "@/server/db";
 import { assertRole, type Session } from "@/server/session";
 import type { Result } from "@/server/domain/cart";
@@ -192,13 +194,49 @@ export async function listOrdersForUser(userId: string): Promise<OrderSummary[]>
   return orders.map(toSummary);
 }
 
-export async function listOrdersForAdmin(status?: OrderStatus): Promise<OrderSummary[]> {
-  const orders = await prisma.order.findMany({
-    where: status ? { status } : undefined,
-    include: { items: { select: { qty: true } }, user: { select: { name: true } } },
-    orderBy: { createdAt: "desc" },
-  });
-  return orders.map(toSummary);
+export async function listOrdersForAdmin(
+  query: { status?: OrderStatus; q?: string; page?: number; take?: number } = {},
+): Promise<ListResult<OrderSummary>> {
+  const q = parseQuery(query.q);
+  const where: Prisma.OrderWhereInput = {
+    ...(query.status ? { status: query.status } : {}),
+    ...(q
+      ? {
+          OR: [
+            { code: { contains: q, mode: "insensitive" } },
+            { shipRecipient: { contains: q, mode: "insensitive" } },
+            { user: { name: { contains: q, mode: "insensitive" } } },
+          ],
+        }
+      : {}),
+  };
+  const include = {
+    items: { select: { qty: true } },
+    user: { select: { name: true } },
+  } satisfies Prisma.OrderInclude;
+
+  if (query.take !== undefined) {
+    const orders = await prisma.order.findMany({
+      where,
+      include,
+      orderBy: { createdAt: "desc" },
+      take: query.take,
+    });
+    return { rows: orders.map(toSummary), total: orders.length };
+  }
+
+  const page = Math.max(1, query.page ?? 1);
+  const [total, orders] = await Promise.all([
+    prisma.order.count({ where }),
+    prisma.order.findMany({
+      where,
+      include,
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+    }),
+  ]);
+  return { rows: orders.map(toSummary), total };
 }
 
 async function buildDetail(order: NonNullable<Awaited<ReturnType<typeof prisma.order.findUnique>>> & {

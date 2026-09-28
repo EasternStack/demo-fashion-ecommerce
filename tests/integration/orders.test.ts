@@ -5,6 +5,7 @@ import {
   adminTransition,
   createOrderFromCart,
   getOrderForAdmin,
+  listOrdersForAdmin,
   transitionOrder,
 } from "@/server/domain/orders";
 import { confirmPayment } from "@/server/domain/payments/mock-gateway";
@@ -144,5 +145,83 @@ describe("transisi status & cancel", () => {
     const detail = await getOrderForAdmin(orderCode);
     expect(detail?.items[0].productName).toBeTruthy();
     expect(detail?.shipping.city).toBe("Bandung");
+  });
+});
+
+describe("listOrdersForAdmin", () => {
+  const testAddress = {
+    recipient: "Penerima Uji",
+    phone: "08123456789",
+    line1: "Jl. Uji No. 1",
+    city: "Jakarta",
+    province: "DKI Jakarta",
+    postalCode: "10110",
+  };
+
+  async function placeOne(userId: string) {
+    return (await createOrderFromCart(userId, testAddress)) as { ok: true; orderCode: string };
+  }
+
+  it("mengembalikan rows dan total tanpa filter", async () => {
+    const user = await makeUser();
+    const cat = await makeCategory();
+    const product = await makeProduct(cat.id, { stock: 5 });
+    await addToCart(user.id, product.variants[0].id, 1);
+    await placeOne(user.id);
+    const result = await listOrdersForAdmin();
+    expect(result.total).toBe(1);
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0].customerName).toBe(user.name);
+  });
+
+  it("memfilter berdasarkan status", async () => {
+    const user = await makeUser();
+    const cat = await makeCategory();
+    const product = await makeProduct(cat.id, { stock: 5 });
+    await addToCart(user.id, product.variants[0].id, 1);
+    const { orderCode } = await placeOne(user.id);
+    expect((await listOrdersForAdmin({ status: "PAID" })).total).toBe(0);
+    expect((await listOrdersForAdmin({ status: "PENDING" })).rows[0].code).toBe(orderCode);
+  });
+
+  it("mencari berdasarkan kode pesanan secara case-insensitive", async () => {
+    const user = await makeUser();
+    const cat = await makeCategory();
+    const product = await makeProduct(cat.id, { stock: 5 });
+    await addToCart(user.id, product.variants[0].id, 1);
+    const { orderCode } = await placeOne(user.id);
+    expect((await listOrdersForAdmin({ q: orderCode.toLowerCase() })).total).toBe(1);
+    expect((await listOrdersForAdmin({ q: "zzz-tidak-ada" })).total).toBe(0);
+  });
+
+  it("mencari berdasarkan nama pembeli", async () => {
+    const user = await makeUser();
+    const cat = await makeCategory();
+    const product = await makeProduct(cat.id, { stock: 5 });
+    await addToCart(user.id, product.variants[0].id, 1);
+    await placeOne(user.id);
+    expect((await listOrdersForAdmin({ q: user.name.toUpperCase() })).total).toBe(1);
+  });
+
+  it("mencari berdasarkan nama penerima", async () => {
+    const user = await makeUser();
+    const cat = await makeCategory();
+    const product = await makeProduct(cat.id, { stock: 5 });
+    await addToCart(user.id, product.variants[0].id, 1);
+    await placeOne(user.id);
+    expect((await listOrdersForAdmin({ q: "penerima uji" })).total).toBe(1);
+  });
+
+  it("take melewati pagination dan total sama dengan panjang rows", async () => {
+    const user = await makeUser();
+    const cat = await makeCategory();
+    const product = await makeProduct(cat.id, { stock: 50 });
+    for (let i = 0; i < 3; i++) {
+      await addToCart(user.id, product.variants[0].id, 1);
+      await placeOne(user.id);
+    }
+    const result = await listOrdersForAdmin({ take: 2 });
+    expect(result.rows).toHaveLength(2);
+    expect(result.total).toBe(2);
   });
 });

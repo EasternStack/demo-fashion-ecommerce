@@ -3,11 +3,39 @@ import { promisify } from "node:util";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { SignJWT, jwtVerify } from "jose";
+import { prisma } from "@/server/db";
 
 const scrypt = promisify(scryptCb);
 
 export type Role = "CUSTOMER" | "ADMIN";
 export type Session = { userId: string; role: Role };
+
+export type AdminSession = Session & { name: string; email: string };
+
+export type AccessDenied = { reason: "NO_SESSION" | "SUSPENDED" | "FORBIDDEN" };
+
+export function evaluateAccess(
+  user: { role: Role; suspendedAt: Date | null } | null,
+  required?: Role,
+): { ok: true } | AccessDenied {
+  if (!user) return { reason: "NO_SESSION" };
+  if (user.suspendedAt) return { reason: "SUSPENDED" };
+  if (required && user.role !== required) return { reason: "FORBIDDEN" };
+  return { ok: true };
+}
+
+type LoadedUser = { role: Role; suspendedAt: Date | null; name: string; email: string };
+
+async function loadSessionUser(): Promise<{ session: Session; user: LoadedUser } | null> {
+  const session = await getCurrentSession();
+  if (!session) return null;
+  const user = await prisma.user.findUnique({
+    where: { id: session.userId },
+    select: { role: true, suspendedAt: true, name: true, email: true },
+  });
+  if (!user) return null;
+  return { session: { userId: session.userId, role: user.role }, user };
+}
 
 const COOKIE_NAME = "esv_session";
 const MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
@@ -68,14 +96,17 @@ export async function getCurrentSession(): Promise<Session | null> {
 }
 
 export async function requireUser(): Promise<Session> {
-  const session = await getCurrentSession();
-  if (!session) redirect("/login");
-  return session;
+  const loaded = await loadSessionUser();
+  const access = evaluateAccess(loaded?.user ?? null);
+  if ("ok" in access) return loaded!.session;
+  redirect("/login");
 }
 
-export async function requireAdmin(): Promise<Session> {
-  const session = await getCurrentSession();
-  if (!session) redirect("/login?next=/admin");
-  if (session.role !== "ADMIN") redirect("/");
-  return session;
+export async function requireAdmin(): Promise<AdminSession> {
+  const loaded = await loadSessionUser();
+  const access = evaluateAccess(loaded?.user ?? null, "ADMIN");
+  if ("ok" in access) {
+    return { ...loaded!.session, name: loaded!.user.name, email: loaded!.user.email };
+  }
+  redirect(access.reason === "FORBIDDEN" ? "/" : "/login?next=/admin");
 }
